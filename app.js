@@ -11,11 +11,12 @@ const client = window.supabase.createClient(
 let currentUser = null;
 let currentSection = "home";
 let notesCache = [];
+let editingNoteId = null;
 
 
-/* =========================
-   SUPABASE / NOTES
-========================= */
+/* =========================================================
+   DATABASE
+========================================================= */
 
 async function loadNotes() {
 
@@ -27,7 +28,7 @@ async function loadNotes() {
     });
 
   if (error) {
-    console.error(error);
+    console.error("Error loading notes:", error);
     return;
   }
 
@@ -35,9 +36,9 @@ async function loadNotes() {
 }
 
 
-/* =========================
-   HTML HELPERS
-========================= */
+/* =========================================================
+   HELPERS
+========================================================= */
 
 function escapeHtml(value) {
 
@@ -54,61 +55,202 @@ function escapeHtml(value) {
 }
 
 
+function formatDate(date) {
+
+  if (!date) return "";
+
+  return new Date(date).toLocaleDateString(
+    undefined,
+    {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    }
+  );
+}
+
+
 function stat(number, label) {
 
   return `
     <div class="card stat">
-      <div class="num">${number}</div>
-      <div class="label">${label}</div>
+
+      <div class="num">
+        ${number}
+      </div>
+
+      <div class="label">
+        ${label}
+      </div>
+
     </div>
   `;
 }
 
+
+function getSectionColor(section) {
+
+  const colors = {
+
+    Medicine: "blue",
+    Finance: "green",
+    Career: "purple",
+    Projects: "orange",
+    Knowledge: "pink",
+    Life: "teal",
+    Inbox: "yellow",
+    Resources: "gray"
+
+  };
+
+  return colors[section] || "blue";
+}
+
+
+/* =========================================================
+   NOTE LIST ITEM
+========================================================= */
 
 function noteListItem(note) {
 
+  const favorite =
+    note.favorite
+      ? "★"
+      : "☆";
+
+
   return `
+
     <div
-      class="list-item"
+      class="list-item note-list-item"
       onclick="openNote('${note.id}')"
     >
 
-      <div>
+      <div class="note-list-main">
 
-        <strong>
-          ${escapeHtml(note.title)}
-        </strong>
+        <div class="note-title-row">
 
-        <small>
-          ${escapeHtml(note.section || "Knowledge")}
-        </small>
+          <strong>
+            ${escapeHtml(note.title)}
+          </strong>
+
+          <button
+            class="favorite-btn"
+            onclick="
+              event.stopPropagation();
+              toggleFavorite('${note.id}');
+            "
+          >
+            ${favorite}
+          </button>
+
+        </div>
+
+
+        ${
+          note.summary
+            ? `
+              <div class="note-summary">
+                ${escapeHtml(note.summary)}
+              </div>
+            `
+            : ""
+        }
+
+
+        <div class="note-meta">
+
+          <span
+            class="tag ${getSectionColor(note.section)}"
+          >
+            ${escapeHtml(note.section || "Knowledge")}
+          </span>
+
+          <span class="tag">
+            ${escapeHtml(note.note_type || "Note")}
+          </span>
+
+          ${
+            note.status
+              ? `
+                <span class="tag">
+                  ${escapeHtml(note.status)}
+                </span>
+              `
+              : ""
+          }
+
+        </div>
 
       </div>
 
-      <span class="tag blue">
-        ${escapeHtml(note.note_type || "Note")}
-      </span>
+
+      <div class="note-date">
+
+        ${formatDate(note.updated_at)}
+
+      </div>
 
     </div>
+
   `;
 }
 
 
+/* =========================================================
+   MODAL
+========================================================= */
+
 function openModal(html) {
 
-  document.getElementById("modalContent").innerHTML = html;
+  document
+    .getElementById("modalContent")
+    .innerHTML = html;
 
   document
     .getElementById("modal")
-    .classList.remove("hidden");
+    .classList
+    .remove("hidden");
 }
 
 
-/* =========================
+function closeModal() {
+
+  document
+    .getElementById("modal")
+    .classList
+    .add("hidden");
+
+  editingNoteId = null;
+}
+
+
+/* =========================================================
    DASHBOARD
-========================= */
+========================================================= */
 
 function renderHome() {
+
+  const favorites =
+    notesCache.filter(
+      note => note.favorite
+    );
+
+
+  const inbox =
+    notesCache.filter(
+      note =>
+        note.section === "Inbox" ||
+        note.status === "Inbox"
+    );
+
+
+  const clinical =
+    notesCache.filter(
+      note =>
+        note.note_type === "Clinical Pearl"
+    );
+
 
   return `
 
@@ -123,18 +265,28 @@ function renderHome() {
       </h1>
 
       <p>
-        Your command center for medicine, finance,
-        career, projects and life.
-        Capture ideas, connect concepts and turn
-        what you learn into reusable assets.
+        Capture ideas, organize what you learn,
+        and build a personal reference system
+        that becomes more valuable over time.
       </p>
 
-      <button
-        class="btn"
-        onclick="newNote()"
-      >
-        ＋ Add something
-      </button>
+      <div class="actions">
+
+        <button
+          class="btn primary"
+          onclick="newNote()"
+        >
+          ＋ New note
+        </button>
+
+        <button
+          class="btn"
+          onclick="quickCapture()"
+        >
+          ⚡ Quick capture
+        </button>
+
+      </div>
 
     </div>
 
@@ -147,21 +299,17 @@ function renderHome() {
       )}
 
       ${stat(
-        "5",
-        "Active projects"
+        favorites.length,
+        "Favorites"
       )}
 
       ${stat(
-        notesCache.filter(
-          note => note.note_type === "Clinical Pearl"
-        ).length,
+        clinical.length,
         "Clinical pearls"
       )}
 
       ${stat(
-        notesCache.filter(
-          note => note.section === "Inbox"
-        ).length,
+        inbox.length,
         "Inbox"
       )}
 
@@ -177,8 +325,7 @@ function renderHome() {
         </h2>
 
         <span class="sub">
-          Everything has a home,
-          but links connect the whole system.
+          Organize knowledge by where it becomes useful.
         </span>
 
       </div>
@@ -191,7 +338,7 @@ function renderHome() {
       ${domain(
         "✚",
         "Medicine",
-        "Clinical knowledge and your outpatient reference.",
+        "Clinical knowledge and outpatient reference.",
         "medicine"
       )}
 
@@ -205,7 +352,7 @@ function renderHome() {
       ${domain(
         "↗",
         "Career",
-        "Your professional life and direction.",
+        "Your professional development and direction.",
         "career"
       )}
 
@@ -229,6 +376,41 @@ function renderHome() {
         "Travel, hobbies and personal development.",
         "life"
       )}
+
+    </div>
+
+
+    <div class="section-title">
+
+      <div>
+
+        <h2>
+          ⭐ Favorite knowledge
+        </h2>
+
+      </div>
+
+      <a onclick="showFavorites()">
+        View all →
+      </a>
+
+    </div>
+
+
+    <div class="card list">
+
+      ${
+        favorites
+          .slice(0, 5)
+          .map(noteListItem)
+          .join("")
+        ||
+        `
+          <div class="sub">
+            You haven't favorited any notes yet.
+          </div>
+        `
+      }
 
     </div>
 
@@ -272,7 +454,16 @@ function renderHome() {
 }
 
 
-function domain(icon, title, description, section) {
+/* =========================================================
+   DOMAINS
+========================================================= */
+
+function domain(
+  icon,
+  title,
+  description,
+  section
+) {
 
   return `
 
@@ -299,9 +490,9 @@ function domain(icon, title, description, section) {
 }
 
 
-/* =========================
-   CATEGORY PAGES
-========================= */
+/* =========================================================
+   CATEGORY DATA
+========================================================= */
 
 const categoryCards = {
 
@@ -521,15 +712,16 @@ const categoryCards = {
 };
 
 
+/* =========================================================
+   CATEGORY PAGE
+========================================================= */
+
 function renderCategory(name) {
 
   const savedNotes =
     notesCache.filter(
       note => note.section === name
     );
-
-  const cards =
-    categoryCards[name] || [];
 
 
   return `
@@ -566,34 +758,40 @@ function renderCategory(name) {
 
     <div class="grid grid-3">
 
-      ${cards.map(card => `
+      ${
+        (categoryCards[name] || [])
+          .map(card => `
 
-        <div
-          class="card clickable"
-          onclick="newNote('${name}')"
-        >
+            <div
+              class="card clickable"
+              onclick="newNote('${name}')"
+            >
 
-          <div class="card-icon">
-            ${card[0]}
-          </div>
+              <div class="card-icon">
+                ${card[0]}
+              </div>
 
-          <div class="card-title">
-            ${card[1]}
-          </div>
+              <div class="card-title">
+                ${card[1]}
+              </div>
 
-          <div class="card-desc">
-            ${card[2]}
-          </div>
+              <div class="card-desc">
+                ${card[2]}
+              </div>
 
-          <div style="margin-top:14px">
-            <span class="tag">
-              ${card[3]}
-            </span>
-          </div>
+              <div style="margin-top:14px">
 
-        </div>
+                <span class="tag">
+                  ${card[3]}
+                </span>
 
-      `).join("")}
+              </div>
+
+            </div>
+
+          `)
+          .join("")
+      }
 
     </div>
 
@@ -636,9 +834,9 @@ function renderCategory(name) {
 }
 
 
-/* =========================
-   OTHER SECTIONS
-========================= */
+/* =========================================================
+   PROJECTS
+========================================================= */
 
 function renderProjects() {
 
@@ -662,13 +860,6 @@ function renderProjects() {
         </div>
 
       </div>
-
-      <button
-        class="btn primary"
-        onclick="alert('Project tracking will be the next database upgrade.')"
-      >
-        ＋ New project
-      </button>
 
     </div>
 
@@ -735,11 +926,17 @@ function project(name, progress) {
 }
 
 
+/* =========================================================
+   INBOX
+========================================================= */
+
 function renderInbox() {
 
   const notes =
     notesCache.filter(
-      note => note.section === "Inbox"
+      note =>
+        note.section === "Inbox" ||
+        note.status === "Inbox"
     );
 
 
@@ -766,9 +963,9 @@ function renderInbox() {
 
       <button
         class="btn primary"
-        onclick="newNote('Inbox')"
+        onclick="quickCapture()"
       >
-        ＋ Capture
+        ⚡ Quick capture
       </button>
 
     </div>
@@ -777,7 +974,9 @@ function renderInbox() {
     <div class="card list">
 
       ${
-        notes.map(noteListItem).join("")
+        notes
+          .map(noteListItem)
+          .join("")
         ||
         `
           <div class="sub">
@@ -791,6 +990,10 @@ function renderInbox() {
   `;
 }
 
+
+/* =========================================================
+   RESOURCES
+========================================================= */
 
 function renderResources() {
 
@@ -821,6 +1024,7 @@ function renderResources() {
 
       </div>
 
+
       <button
         class="btn primary"
         onclick="newNote('Resources')"
@@ -834,7 +1038,9 @@ function renderResources() {
     <div class="card list">
 
       ${
-        notes.map(noteListItem).join("")
+        notes
+          .map(noteListItem)
+          .join("")
         ||
         `
           <div class="sub">
@@ -848,6 +1054,10 @@ function renderResources() {
   `;
 }
 
+
+/* =========================================================
+   SETTINGS
+========================================================= */
 
 function renderSettings() {
 
@@ -904,14 +1114,23 @@ function renderSettings() {
         </li>
 
         <li>
-          Row Level Security protects database records.
+          Row Level Security protects your data.
         </li>
 
       </ul>
 
 
+      <h3>
+        Knowledge philosophy
+      </h3>
+
       <p>
-        <b>Important:</b>
+        Capture → Organize → Connect → Review → Apply.
+      </p>
+
+
+      <p>
+        <b>Medical privacy:</b>
         Never store patient-identifiable information
         or PHI in this application.
       </p>
@@ -922,9 +1141,9 @@ function renderSettings() {
 }
 
 
-/* =========================
+/* =========================================================
    NAVIGATION
-========================= */
+========================================================= */
 
 function navigate(section) {
 
@@ -977,26 +1196,72 @@ function navigate(section) {
   }
 
 
-  document.getElementById(
-    "content"
-  ).innerHTML = html;
+  document
+    .getElementById("content")
+    .innerHTML = html;
+
 }
 
 
-/* =========================
-   CREATE NOTE
-========================= */
+/* =========================================================
+   NOTE EDITOR
+========================================================= */
 
 function newNote(section = "") {
+
+  editingNoteId = null;
+
+
+  openNoteEditor(
+    null,
+    section
+  );
+
+}
+
+
+function openNoteEditor(note = null, section = "") {
+
+  const isEditing = !!note;
+
+
+  const selectedSection =
+    note?.section ||
+    section ||
+    "Medicine";
+
+
+  const selectedType =
+    note?.note_type ||
+    "Note";
+
+
+  const selectedStatus =
+    note?.status ||
+    "Active";
+
+
+  const tags =
+    note?.tags || [];
+
 
   openModal(`
 
     <div class="eyebrow">
-      NEW NOTE
+
+      ${isEditing ? "EDIT NOTE" : "NEW NOTE"}
+
     </div>
 
+
     <h2>
-      Capture knowledge
+
+      ${
+        isEditing
+          ? "Update knowledge"
+          : "Capture knowledge"
+      }
+
     </h2>
 
 
@@ -1012,7 +1277,8 @@ function newNote(section = "") {
         <input
           id="noteTitle"
           required
-          placeholder="e.g. Hypertension treatment pearls"
+          value="${escapeHtml(note?.title || "")}"
+          placeholder="What is this about?"
         >
 
       </label>
@@ -1020,90 +1286,140 @@ function newNote(section = "") {
 
       <label>
 
-        Area
+        One-sentence summary
 
-        <select id="noteArea">
-
-          <option
-            ${section === "Medicine" ? "selected" : ""}
-          >
-            Medicine
-          </option>
-
-          <option
-            ${section === "Finance" ? "selected" : ""}
-          >
-            Finance
-          </option>
-
-          <option
-            ${section === "Career" ? "selected" : ""}
-          >
-            Career
-          </option>
-
-          <option
-            ${section === "Knowledge" ? "selected" : ""}
-          >
-            Knowledge
-          </option>
-
-          <option
-            ${section === "Life" ? "selected" : ""}
-          >
-            Life
-          </option>
-
-          <option
-            ${section === "Resources" ? "selected" : ""}
-          >
-            Resources
-          </option>
-
-          <option
-            ${section === "Inbox" ? "selected" : ""}
-          >
-            Inbox
-          </option>
-
-        </select>
+        <input
+          id="noteSummary"
+          value="${escapeHtml(note?.summary || "")}"
+          placeholder="What should future-you remember?"
+        >
 
       </label>
 
 
-      <label>
+      <div class="form-grid">
 
-        Type
+        <label>
 
-        <select id="noteType">
+          Area
 
-          <option>
-            Note
-          </option>
+          <select id="noteArea">
 
-          <option>
-            Clinical Pearl
-          </option>
+            ${[
+              "Medicine",
+              "Finance",
+              "Career",
+              "Knowledge",
+              "Life",
+              "Projects",
+              "Resources",
+              "Inbox"
+            ]
+              .map(
+                item => `
+                  <option
+                    ${
+                      selectedSection === item
+                        ? "selected"
+                        : ""
+                    }
+                  >
+                    ${item}
+                  </option>
+                `
+              )
+              .join("")}
 
-          <option>
-            Concept
-          </option>
+          </select>
 
-          <option>
-            Framework
-          </option>
+        </label>
 
-          <option>
-            Idea
-          </option>
 
-          <option>
-            Question
-          </option>
+        <label>
 
-        </select>
+          Type
 
-      </label>
+          <select id="noteType">
+
+            ${[
+              "Note",
+              "Clinical Pearl",
+              "Concept",
+              "Framework",
+              "Idea",
+              "Question",
+              "Algorithm",
+              "Reference"
+            ]
+              .map(
+                item => `
+                  <option
+                    ${
+                      selectedType === item
+                        ? "selected"
+                        : ""
+                    }
+                  >
+                    ${item}
+                  </option>
+                `
+              )
+              .join("")}
+
+          </select>
+
+        </label>
+
+      </div>
+
+
+      <div class="form-grid">
+
+        <label>
+
+          Status
+
+          <select id="noteStatus">
+
+            ${[
+              "Active",
+              "Inbox",
+              "Review",
+              "Archived"
+            ]
+              .map(
+                item => `
+                  <option
+                    ${
+                      selectedStatus === item
+                        ? "selected"
+                        : ""
+                    }
+                  >
+                    ${item}
+                  </option>
+                `
+              )
+              .join("")}
+
+          </select>
+
+        </label>
+
+
+        <label>
+
+          Review date
+
+          <input
+            id="noteReviewDate"
+            type="date"
+            value="${note?.review_date || ""}"
+          >
+
+        </label>
+
+      </div>
 
 
       <label>
@@ -1112,7 +1428,8 @@ function newNote(section = "") {
 
         <input
           id="noteTags"
-          placeholder="comma, separated, tags"
+          value="${escapeHtml(tags.join(", "))}"
+          placeholder="hypertension, cardiology, outpatient"
         >
 
       </label>
@@ -1125,8 +1442,54 @@ function newNote(section = "") {
         <textarea
           id="noteContent"
           required
-          placeholder="What do you want future-you to remember?"
-        ></textarea>
+          placeholder="Write the actual knowledge here..."
+        >${escapeHtml(note?.content || "")}</textarea>
+
+      </label>
+
+
+      <div class="form-grid">
+
+        <label>
+
+          Source
+
+          <input
+            id="noteSource"
+            value="${escapeHtml(note?.source || "")}"
+            placeholder="ACC guideline, book, lecture..."
+          >
+
+        </label>
+
+
+        <label>
+
+          Source URL
+
+          <input
+            id="noteUrl"
+            type="url"
+            value="${escapeHtml(note?.url || "")}"
+            placeholder="https://..."
+          >
+
+        </label>
+
+      </div>
+
+
+      <label class="checkbox-row">
+
+        <input
+          id="noteFavorite"
+          type="checkbox"
+          ${note?.favorite ? "checked" : ""}
+        >
+
+        <span>
+          ⭐ Add to favorites
+        </span>
 
       </label>
 
@@ -1135,7 +1498,13 @@ function newNote(section = "") {
         class="btn primary"
         type="submit"
       >
-        Save note
+
+        ${
+          isEditing
+            ? "Save changes"
+            : "Save note"
+        }
+
       </button>
 
 
@@ -1162,9 +1531,9 @@ function newNote(section = "") {
 }
 
 
-/* =========================
+/* =========================================================
    SAVE NOTE
-========================= */
+========================================================= */
 
 async function saveNote() {
 
@@ -1177,11 +1546,17 @@ async function saveNote() {
       .filter(Boolean);
 
 
-  const note = {
+  const noteData = {
 
     title:
       document
         .getElementById("noteTitle")
+        .value
+        .trim(),
+
+    summary:
+      document
+        .getElementById("noteSummary")
         .value
         .trim(),
 
@@ -1200,12 +1575,34 @@ async function saveNote() {
         .getElementById("noteType")
         .value,
 
+    status:
+      document
+        .getElementById("noteStatus")
+        .value,
+
     tags,
 
-    favorite: false,
+    source:
+      document
+        .getElementById("noteSource")
+        .value
+        .trim(),
 
-    user_id:
-      currentUser.id,
+    url:
+      document
+        .getElementById("noteUrl")
+        .value
+        .trim(),
+
+    favorite:
+      document
+        .getElementById("noteFavorite")
+        .checked,
+
+    review_date:
+      document
+        .getElementById("noteReviewDate")
+        .value || null,
 
     updated_at:
       new Date().toISOString()
@@ -1213,19 +1610,38 @@ async function saveNote() {
   };
 
 
-  const { error } =
-    await client
-      .from("notes")
-      .insert(note);
+  let response;
 
 
-  if (error) {
+  if (editingNoteId) {
+
+    response =
+      await client
+        .from("notes")
+        .update(noteData)
+        .eq("id", editingNoteId);
+
+  } else {
+
+    response =
+      await client
+        .from("notes")
+        .insert({
+          ...noteData,
+          user_id: currentUser.id
+        });
+
+  }
+
+
+  if (response.error) {
 
     document
       .getElementById("saveMessage")
-      .textContent = error.message;
+      .textContent =
+      response.error.message;
 
-    console.error(error);
+    console.error(response.error);
 
     return;
 
@@ -1235,9 +1651,7 @@ async function saveNote() {
   await loadNotes();
 
 
-  document
-    .getElementById("modal")
-    .classList.add("hidden");
+  closeModal();
 
 
   navigate(currentSection);
@@ -1245,75 +1659,9 @@ async function saveNote() {
 }
 
 
-/* =========================
-   OPEN NOTE
-========================= */
-
-function openNote(id) {
-
-  const note =
-    notesCache.find(
-      item => item.id === id
-    );
-
-
-  if (!note) return;
-
-
-  openModal(`
-
-    <div class="eyebrow">
-
-      ${escapeHtml(note.section)}
-      ·
-      ${escapeHtml(note.note_type || "Note")}
-
-    </div>
-
-
-    <h2>
-      ${escapeHtml(note.title)}
-    </h2>
-
-
-    <div class="note-body">
-
-      ${escapeHtml(note.content || "")
-        .replace(/\n/g, "<br>")}
-
-    </div>
-
-
-    <div
-      class="actions"
-      style="margin-top:24px"
-    >
-
-      <button
-        class="btn"
-        onclick="editNote('${note.id}')"
-      >
-        Edit
-      </button>
-
-
-      <button
-        class="btn"
-        onclick="deleteNote('${note.id}')"
-      >
-        Delete
-      </button>
-
-    </div>
-
-  `);
-
-}
-
-
-/* =========================
-   EDIT NOTE
-========================= */
+/* =========================================================
+   EDIT
+========================================================= */
 
 function editNote(id) {
 
@@ -1326,112 +1674,58 @@ function editNote(id) {
   if (!note) return;
 
 
-  newNote(note.section);
+  editingNoteId = id;
 
-
-  document.getElementById(
-    "noteTitle"
-  ).value = note.title;
-
-
-  document.getElementById(
-    "noteType"
-  ).value = note.note_type || "Note";
-
-
-  document.getElementById(
-    "noteTags"
-  ).value =
-    (note.tags || []).join(", ");
-
-
-  document.getElementById(
-    "noteContent"
-  ).value =
-    note.content || "";
-
-
-  document
-    .getElementById("noteForm")
-    .onsubmit = async event => {
-
-      event.preventDefault();
-
-
-      const updated = {
-
-        title:
-          document
-            .getElementById("noteTitle")
-            .value
-            .trim(),
-
-        content:
-          document
-            .getElementById("noteContent")
-            .value,
-
-        section:
-          document
-            .getElementById("noteArea")
-            .value,
-
-        note_type:
-          document
-            .getElementById("noteType")
-            .value,
-
-        tags:
-          document
-            .getElementById("noteTags")
-            .value
-            .split(",")
-            .map(tag => tag.trim())
-            .filter(Boolean),
-
-        updated_at:
-          new Date().toISOString()
-
-      };
-
-
-      const { error } =
-        await client
-          .from("notes")
-          .update(updated)
-          .eq("id", id);
-
-
-      if (error) {
-
-        document
-          .getElementById("saveMessage")
-          .textContent =
-          error.message;
-
-        return;
-
-      }
-
-
-      await loadNotes();
-
-
-      document
-        .getElementById("modal")
-        .classList.add("hidden");
-
-
-      navigate(currentSection);
-
-    };
+  openNoteEditor(note);
 
 }
 
 
-/* =========================
-   DELETE NOTE
-========================= */
+/* =========================================================
+   FAVORITES
+========================================================= */
+
+async function toggleFavorite(id) {
+
+  const note =
+    notesCache.find(
+      item => item.id === id
+    );
+
+
+  if (!note) return;
+
+
+  const { error } =
+    await client
+      .from("notes")
+      .update({
+        favorite: !note.favorite,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", id);
+
+
+  if (error) {
+
+    console.error(error);
+
+    return;
+
+  }
+
+
+  await loadNotes();
+
+
+  navigate(currentSection);
+
+}
+
+
+/* =========================================================
+   DELETE
+========================================================= */
 
 async function deleteNote(id) {
 
@@ -1464,46 +1758,271 @@ async function deleteNote(id) {
 
   await loadNotes();
 
-
-  document
-    .getElementById("modal")
-    .classList.add("hidden");
-
+  closeModal();
 
   navigate(currentSection);
 
 }
 
 
-/* =========================
-   SHOW ALL NOTES
-========================= */
+/* =========================================================
+   VIEW NOTE
+========================================================= */
 
-function showAllNotes(section) {
+function openNote(id) {
 
-  const notes =
-    section
-      ? notesCache.filter(
-          note => note.section === section
-        )
-      : notesCache;
+  const note =
+    notesCache.find(
+      item => item.id === id
+    );
+
+
+  if (!note) return;
+
+
+  const tags =
+    (note.tags || [])
+      .map(
+        tag => `
+          <span class="tag">
+            ${escapeHtml(tag)}
+          </span>
+        `
+      )
+      .join("");
+
+
+  openModal(`
+
+    <div class="note-header">
+
+      <div>
+
+        <div class="eyebrow">
+
+          ${escapeHtml(note.section || "")}
+          ·
+          ${escapeHtml(note.note_type || "Note")}
+
+        </div>
+
+
+        <h2>
+          ${escapeHtml(note.title)}
+        </h2>
+
+      </div>
+
+
+      <button
+        class="favorite-large"
+        onclick="toggleFavoriteFromModal('${note.id}')"
+      >
+
+        ${
+          note.favorite
+            ? "★"
+            : "☆"
+        }
+
+      </button>
+
+    </div>
+
+
+    ${
+      note.summary
+        ? `
+          <div class="note-summary-large">
+
+            ${escapeHtml(note.summary)}
+
+          </div>
+        `
+        : ""
+    }
+
+
+    <div class="note-meta">
+
+      ${
+        note.status
+          ? `
+            <span class="tag">
+              ${escapeHtml(note.status)}
+            </span>
+          `
+          : ""
+      }
+
+      ${tags}
+
+    </div>
+
+
+    <div class="note-body">
+
+      ${escapeHtml(note.content || "")
+        .replace(/\n/g, "<br>")}
+
+    </div>
+
+
+    ${
+      note.source || note.url
+        ? `
+
+          <div class="source-box">
+
+            <strong>
+              Source
+            </strong>
+
+            ${
+              note.source
+                ? `
+                  <div>
+                    ${escapeHtml(note.source)}
+                  </div>
+                `
+                : ""
+            }
+
+            ${
+              note.url
+                ? `
+                  <a
+                    href="${escapeHtml(note.url)}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open source →
+                  </a>
+                `
+                : ""
+            }
+
+          </div>
+
+        `
+        : ""
+    }
+
+
+    ${
+      note.review_date
+        ? `
+          <div class="review-box">
+
+            📅 Review on
+            <strong>
+              ${formatDate(note.review_date)}
+            </strong>
+
+          </div>
+        `
+        : ""
+    }
+
+
+    <div class="actions">
+
+      <button
+        class="btn"
+        onclick="editNote('${note.id}')"
+      >
+        Edit
+      </button>
+
+
+      <button
+        class="btn"
+        onclick="deleteNote('${note.id}')"
+      >
+        Delete
+      </button>
+
+    </div>
+
+  `);
+
+}
+
+
+async function toggleFavoriteFromModal(id) {
+
+  closeModal();
+
+  await toggleFavorite(id);
+
+}
+
+
+/* =========================================================
+   FAVORITES VIEW
+========================================================= */
+
+function showFavorites() {
+
+  const favorites =
+    notesCache.filter(
+      note => note.favorite
+    );
 
 
   openModal(`
 
     <div class="eyebrow">
-      NOTES
+      FAVORITES
     </div>
 
     <h2>
-      ${section || "All notes"}
+      Your highest-value knowledge
     </h2>
 
 
     <div class="card list">
 
       ${
-        notes
+        favorites
+          .map(noteListItem)
+          .join("")
+        ||
+        `
+          <div class="sub">
+            No favorites yet.
+          </div>
+        `
+      }
+
+    </div>
+
+  `);
+
+}
+
+
+/* =========================================================
+   ALL NOTES
+========================================================= */
+
+function showAllNotes() {
+
+  openModal(`
+
+    <div class="eyebrow">
+      KNOWLEDGE LIBRARY
+    </div>
+
+    <h2>
+      All notes
+    </h2>
+
+
+    <div class="card list">
+
+      ${
+        notesCache
           .map(noteListItem)
           .join("")
         ||
@@ -1521,203 +2040,135 @@ function showAllNotes(section) {
 }
 
 
-/* =========================
-   LOGIN
-========================= */
+/* =========================================================
+   QUICK CAPTURE
+========================================================= */
 
-async function login() {
+function quickCapture() {
 
-  const email =
-    document
-      .getElementById("loginEmail")
-      .value;
+  openModal(`
 
+    <div class="eyebrow">
+      QUICK CAPTURE
+    </div>
 
-  const password =
-    document
-      .getElementById("loginPassword")
-      .value;
+    <h2>
+      Get it out of your head.
+    </h2>
 
-
-  const { data, error } =
-    await client.auth.signInWithPassword({
-      email,
-      password
-    });
+    <p class="sub">
+      Don't organize it yet.
+      Just capture the thought.
+    </p>
 
 
-  if (error) {
+    <form
+      id="quickCaptureForm"
+      class="form"
+    >
 
-    document
-      .getElementById("loginMessage")
-      .textContent =
-      error.message;
+      <label>
 
-    return;
+        What do you want to remember?
 
-  }
+        <input
+          id="quickTitle"
+          required
+          placeholder="e.g. Research SGLT2 sick-day rules"
+        >
 
-
-  currentUser = data.user;
-
-  await showApp();
-
-}
+      </label>
 
 
-async function showApp() {
+      <label>
+
+        Details
+
+        <textarea
+          id="quickContent"
+          placeholder="Add anything useful..."
+        ></textarea>
+
+      </label>
+
+
+      <button
+        class="btn primary"
+        type="submit"
+      >
+        Capture
+      </button>
+
+    </form>
+
+  `);
+
 
   document
-    .getElementById("loginScreen")
-    .classList.add("hidden");
-
-
-  document
-    .getElementById("appShell")
-    .classList.remove("hidden");
-
-
-  document
-    .getElementById("avatar")
-    .textContent =
-    (currentUser.email || "E")
-      .charAt(0)
-      .toUpperCase();
-
-
-  await loadNotes();
-
-
-  navigate("home");
-
-}
-
-
-async function logout() {
-
-  await client.auth.signOut();
-
-  location.reload();
-
-}
-
-
-/* =========================
-   EVENT LISTENERS
-========================= */
-
-document
-  .getElementById("loginForm")
-  .onsubmit = event => {
-
-    event.preventDefault();
-
-    login();
-
-  };
-
-
-document
-  .getElementById("logoutBtn")
-  .onclick = logout;
-
-
-document
-  .getElementById("nav")
-  .onclick = event => {
-
-    const button =
-      event.target.closest(".nav-item");
-
-
-    if (
-      button &&
-      button.dataset.section
-    ) {
-
-      navigate(
-        button.dataset.section
-      );
-
-    }
-
-  };
-
-
-document
-  .getElementById("modalClose")
-  .onclick = () => {
-
-    document
-      .getElementById("modal")
-      .classList.add("hidden");
-
-  };
-
-
-document
-  .getElementById("modal")
-  .onclick = event => {
-
-    if (
-      event.target.id === "modal"
-    ) {
-
-      event.currentTarget
-        .classList
-        .add("hidden");
-
-    }
-
-  };
-
-
-document
-  .getElementById("themeBtn")
-  .onclick = () => {
-
-    document.body.classList.toggle(
-      "dark"
-    );
-
-  };
-
-
-document
-  .getElementById("mobileMenu")
-  .onclick = () => {
-
-    document
-      .querySelector(".sidebar")
-      .classList.toggle("open");
-
-  };
-
-
-/* Keyboard shortcut */
-
-document.addEventListener(
-  "keydown",
-  event => {
-
-    if (
-      (event.metaKey || event.ctrlKey) &&
-      event.key.toLowerCase() === "k"
-    ) {
+    .getElementById("quickCaptureForm")
+    .onsubmit = async event => {
 
       event.preventDefault();
 
-      document
-        .getElementById("search")
-        .focus();
 
-    }
+      const { error } =
+        await client
+          .from("notes")
+          .insert({
 
-  }
-);
+            title:
+              document
+                .getElementById("quickTitle")
+                .value
+                .trim(),
+
+            content:
+              document
+                .getElementById("quickContent")
+                .value,
+
+            section: "Inbox",
+
+            note_type: "Idea",
+
+            status: "Inbox",
+
+            tags: [],
+
+            favorite: false,
+
+            user_id:
+              currentUser.id,
+
+            updated_at:
+              new Date().toISOString()
+
+          });
 
 
-/* Search */
+      if (error) {
+
+        alert(error.message);
+
+        return;
+
+      }
+
+
+      await loadNotes();
+
+      closeModal();
+
+      navigate("inbox");
+
+    };
+
+}
+
+
+/* =========================================================
+   SEARCH
+========================================================= */
 
 document
   .getElementById("search")
@@ -1745,7 +2196,17 @@ document
 
           ${note.title}
 
+          ${note.summary}
+
           ${note.content}
+
+          ${note.section}
+
+          ${note.note_type}
+
+          ${note.status}
+
+          ${note.source}
 
           ${(note.tags || []).join(" ")}
 
@@ -1804,9 +2265,211 @@ document
   };
 
 
-/* =========================
-   START APPLICATION
-========================= */
+/* =========================================================
+   AUTH
+========================================================= */
+
+async function login() {
+
+  const email =
+    document
+      .getElementById("loginEmail")
+      .value;
+
+
+  const password =
+    document
+      .getElementById("loginPassword")
+      .value;
+
+
+  const { data, error } =
+    await client.auth.signInWithPassword({
+
+      email,
+
+      password
+
+    });
+
+
+  if (error) {
+
+    document
+      .getElementById("loginMessage")
+      .textContent =
+      error.message;
+
+    return;
+
+  }
+
+
+  currentUser =
+    data.user;
+
+
+  await showApp();
+
+}
+
+
+async function showApp() {
+
+  document
+    .getElementById("loginScreen")
+    .classList
+    .add("hidden");
+
+
+  document
+    .getElementById("appShell")
+    .classList
+    .remove("hidden");
+
+
+  document
+    .getElementById("avatar")
+    .textContent =
+    (
+      currentUser.email ||
+      "E"
+    )
+      .charAt(0)
+      .toUpperCase();
+
+
+  await loadNotes();
+
+  navigate("home");
+
+}
+
+
+async function logout() {
+
+  await client.auth.signOut();
+
+  location.reload();
+
+}
+
+
+/* =========================================================
+   EVENTS
+========================================================= */
+
+document
+  .getElementById("loginForm")
+  .onsubmit = event => {
+
+    event.preventDefault();
+
+    login();
+
+  };
+
+
+document
+  .getElementById("logoutBtn")
+  .onclick = logout;
+
+
+document
+  .getElementById("nav")
+  .onclick = event => {
+
+    const button =
+      event.target.closest(".nav-item");
+
+
+    if (
+      button &&
+      button.dataset.section
+    ) {
+
+      navigate(
+        button.dataset.section
+      );
+
+    }
+
+  };
+
+
+document
+  .getElementById("modalClose")
+  .onclick = closeModal;
+
+
+document
+  .getElementById("modal")
+  .onclick = event => {
+
+    if (
+      event.target.id === "modal"
+    ) {
+
+      closeModal();
+
+    }
+
+  };
+
+
+document
+  .getElementById("themeBtn")
+  .onclick = () => {
+
+    document.body.classList.toggle(
+      "dark"
+    );
+
+  };
+
+
+document
+  .getElementById("mobileMenu")
+  .onclick = () => {
+
+    document
+      .querySelector(".sidebar")
+      .classList.toggle("open");
+
+  };
+
+
+document.addEventListener(
+  "keydown",
+  event => {
+
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      event.key.toLowerCase() === "k"
+    ) {
+
+      event.preventDefault();
+
+      document
+        .getElementById("search")
+        .focus();
+
+    }
+
+
+    if (event.key === "Escape") {
+
+      closeModal();
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   INITIALIZE
+========================================================= */
 
 (async function initialize() {
 
@@ -1820,7 +2483,8 @@ document
 
   if (session) {
 
-    currentUser = session.user;
+    currentUser =
+      session.user;
 
     await showApp();
 
