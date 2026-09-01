@@ -6,52 +6,268 @@
   <title>My Knowledge OS</title>
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-  <div class="app">
+
+  <!-- LOGIN SCREEN -->
+  <div id="loginScreen" class="login-screen">
+
+    <div class="login-card">
+
+      <div class="brand-mark large">K</div>
+
+      <div class="eyebrow">
+        PERSONAL KNOWLEDGE OS
+      </div>
+
+      <h1>Welcome back.</h1>
+
+      <p class="sub">
+        Sign in to access your private knowledge system.
+      </p>
+
+      <form id="loginForm" class="form">
+
+        <label>
+          Email
+          <input
+            id="loginEmail"
+            type="email"
+            required
+            autocomplete="email"
+          >
+        </label>
+
+        <label>
+          Password
+          <input
+            id="loginPassword"
+            type="password"
+            required
+            autocomplete="current-password"
+          >
+        </label>
+
+        <button
+          class="btn primary"
+          type="submit"
+        >
+          Sign in
+        </button>
+
+        <div
+          id="loginMessage"
+          class="login-message"
+        ></div>
+
+      </form>
+
+    </div>
+
+  </div>
+
+
+  <!-- MAIN APPLICATION -->
+  <div id="appShell" class="app hidden">
+
     <aside class="sidebar">
+
       <div class="brand">
-        <div class="brand-mark">K</div>
-        <div><strong>Knowledge OS</strong><span>Personal command center</span></div>
+
+        <div class="brand-mark">
+          K
+        </div>
+
+        <div>
+          <strong>Knowledge OS</strong>
+          <span>Personal command center</span>
+        </div>
+
       </div>
+
+
       <nav id="nav">
-        <button class="nav-item active" data-section="home">⌂ <span>Dashboard</span></button>
-        <button class="nav-item" data-section="inbox">↓ <span>Inbox</span><b id="inboxCount">3</b></button>
-        <button class="nav-item" data-section="medicine">✚ <span>Medicine</span></button>
-        <button class="nav-item" data-section="finance">$ <span>Finance</span></button>
-        <button class="nav-item" data-section="career">↗ <span>Career</span></button>
-        <button class="nav-item" data-section="projects">◆ <span>Projects</span></button>
-        <button class="nav-item" data-section="knowledge">◇ <span>Knowledge</span></button>
-        <button class="nav-item" data-section="life">○ <span>Life</span></button>
-        <button class="nav-item" data-section="resources">▤ <span>Resources</span></button>
+
+        <button
+          class="nav-item active"
+          data-section="home"
+        >
+          ⌂
+          <span>Dashboard</span>
+        </button>
+
+        <button
+          class="nav-item"
+          data-section="inbox"
+        >
+          ↓
+          <span>Inbox</span>
+        </button>
+
+        <button
+          class="nav-item"
+          data-section="medicine"
+        >
+          ✚
+          <span>Medicine</span>
+        </button>
+
+        <button
+          class="nav-item"
+          data-section="finance"
+        >
+          $
+          <span>Finance</span>
+        </button>
+
+        <button
+          class="nav-item"
+          data-section="career"
+        >
+          ↗
+          <span>Career</span>
+        </button>
+
+        <button
+          class="nav-item"
+          data-section="projects"
+        >
+          ◆
+          <span>Projects</span>
+        </button>
+
+        <button
+          class="nav-item"
+          data-section="knowledge"
+        >
+          ◇
+          <span>Knowledge</span>
+        </button>
+
+        <button
+          class="nav-item"
+          data-section="life"
+        >
+          ○
+          <span>Life</span>
+        </button>
+
+        <button
+          class="nav-item"
+          data-section="resources"
+        >
+          ▤
+          <span>Resources</span>
+        </button>
+
       </nav>
+
+
       <div class="sidebar-bottom">
-        <button class="nav-item" data-section="settings">⚙ <span>Settings</span></button>
+
+        <button
+          class="nav-item"
+          data-section="settings"
+        >
+          ⚙
+          <span>Settings</span>
+        </button>
+
+        <button
+          class="nav-item"
+          id="logoutBtn"
+        >
+          ↪
+          <span>Sign out</span>
+        </button>
+
       </div>
+
     </aside>
 
+
     <main class="main">
+
       <header class="topbar">
-        <button id="mobileMenu" class="icon-btn">☰</button>
+
+        <button
+          id="mobileMenu"
+          class="icon-btn"
+        >
+          ☰
+        </button>
+
+
         <div class="search-wrap">
+
           <span>⌕</span>
-          <input id="search" type="search" placeholder="Search your knowledge...">
+
+          <input
+            id="search"
+            type="search"
+            placeholder="Search your notes..."
+          >
+
           <kbd>⌘ K</kbd>
+
         </div>
-        <button class="icon-btn" id="themeBtn" title="Toggle theme">◐</button>
-        <button class="avatar">E</button>
+
+
+        <button
+          class="icon-btn"
+          id="themeBtn"
+        >
+          ◐
+        </button>
+
+
+        <button
+          class="avatar"
+          id="avatar"
+        >
+          E
+        </button>
+
       </header>
 
-      <div id="content" class="content"></div>
+
+      <div
+        id="content"
+        class="content"
+      ></div>
+
     </main>
+
   </div>
 
-  <div id="modal" class="modal hidden">
+
+  <!-- MODAL -->
+  <div
+    id="modal"
+    class="modal hidden"
+  >
+
     <div class="modal-card">
-      <button class="modal-close" id="modalClose">×</button>
+
+      <button
+        class="modal-close"
+        id="modalClose"
+      >
+        ×
+      </button>
+
       <div id="modalContent"></div>
+
     </div>
+
   </div>
 
+
+  <!-- SUPABASE -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- OUR APPLICATION -->
   <script src="app.js"></script>
+
 </body>
 </html>
