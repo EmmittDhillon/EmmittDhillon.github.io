@@ -1,4 +1,3 @@
-```javascript
 const SUPABASE_URL = "https://uvshnvndkvplhwalopid.supabase.co";
 const SUPABASE_KEY = "sb_publishable_HFFGKwhEbvajsYdoHN_AHQ_qsns3gUy";
 
@@ -21,9 +20,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupSearch();
   setupGlobalButtons();
 
-  const { data } = await supabaseClient.auth.getSession();
+  const { data, error } = await supabaseClient.auth.getSession();
 
-  if (data.session) {
+  if (data?.session) {
     currentUser = data.session.user;
     await loadApp();
   } else {
@@ -70,7 +69,7 @@ function showLogin() {
           <button type="submit">Sign In</button>
         </form>
 
-        <p id="loginError"></p>
+        <p id="loginError" style="color: red; margin-top: 10px;"></p>
       </div>
     </div>
   `;
@@ -80,16 +79,19 @@ function showLogin() {
     .addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const email = document.getElementById("loginEmail").value;
+      const email = document.getElementById("loginEmail").value.trim();
       const password = document.getElementById("loginPassword").value;
+      const errorElement = document.getElementById("loginError");
 
-      const { error } = await supabaseClient.auth.signInWithPassword({
+      errorElement.textContent = "";
+
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
         email,
         password
       });
 
       if (error) {
-        document.getElementById("loginError").textContent = error.message;
+        errorElement.textContent = error.message;
       }
     });
 }
@@ -104,6 +106,8 @@ async function loadApp() {
 }
 
 async function loadNotes() {
+  if (!currentUser) return;
+
   const { data, error } = await supabaseClient
     .from("notes")
     .select("*")
@@ -305,7 +309,7 @@ function renderNoteCards(noteList) {
     return `
       <div class="empty-state">
         <p>No notes yet.</p>
-        <button id="emptyNewNote">Create your first note</button>
+        <button id="emptyNewNote" onclick="openNoteEditor()">Create your first note</button>
       </div>
     `;
   }
@@ -449,7 +453,7 @@ function renderSettings() {
     <div class="settings-card">
       <p>
         Logged in as:
-        <strong>${escapeHtml(currentUser.email)}</strong>
+        <strong>${escapeHtml(currentUser?.email || "")}</strong>
       </p>
     </div>
   `;
@@ -1052,4 +1056,3 @@ function formatNoteContent(content) {
     .map(line => `<p>${escapeHtml(line)}</p>`)
     .join("");
 }
-```
