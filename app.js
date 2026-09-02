@@ -1,3 +1,4 @@
+```javascript
 const SUPABASE_URL = "https://uvshnvndkvplhwalopid.supabase.co";
 const SUPABASE_KEY = "sb_publishable_HFFGKwhEbvajsYdoHN_AHQ_qsns3gUy";
 
@@ -9,94 +10,88 @@ const supabaseClient = window.supabase.createClient(
 let currentUser = null;
 let notes = [];
 let currentNote = null;
+let currentView = "dashboard";
 
 /* =========================
    INITIALIZATION
 ========================= */
 
 document.addEventListener("DOMContentLoaded", async () => {
-  // Set up login form handler
-  setupLoginForm();
-  
-  // Check if user is already logged in
+  setupNavigation();
+  setupSearch();
+  setupGlobalButtons();
+
   const { data } = await supabaseClient.auth.getSession();
 
   if (data.session) {
     currentUser = data.session.user;
-    showApp();
     await loadApp();
   } else {
-    showLoginPage();
+    showLogin();
   }
 
-  // Listen for auth state changes
   supabaseClient.auth.onAuthStateChange(async (_event, session) => {
     if (session) {
       currentUser = session.user;
-      showApp();
       await loadApp();
     } else {
       currentUser = null;
-      showLoginPage();
+      showLogin();
     }
   });
 });
 
 /* =========================
-   AUTH - LOGIN FORM SETUP
+   AUTH
 ========================= */
 
-function setupLoginForm() {
-  const loginForm = document.getElementById("loginForm");
-  
-  if (!loginForm) return;
+function showLogin() {
+  document.body.innerHTML = `
+    <div class="auth-container">
+      <div class="auth-card">
+        <h1>My Knowledge System</h1>
+        <p>Sign in to continue.</p>
 
-  loginForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
+        <form id="loginForm">
+          <input
+            type="email"
+            id="loginEmail"
+            placeholder="Email"
+            required
+          />
 
-    const email = document.getElementById("loginEmail").value;
-    const password = document.getElementById("loginPassword").value;
-    const messageEl = document.getElementById("loginMessage");
+          <input
+            type="password"
+            id="loginPassword"
+            placeholder="Password"
+            required
+          />
 
-    if (!email || !password) {
-      messageEl.textContent = "Please enter both email and password.";
-      messageEl.classList.add("error");
-      return;
-    }
+          <button type="submit">Sign In</button>
+        </form>
 
-    try {
+        <p id="loginError"></p>
+      </div>
+    </div>
+  `;
+
+  document
+    .getElementById("loginForm")
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById("loginEmail").value;
+      const password = document.getElementById("loginPassword").value;
+
       const { error } = await supabaseClient.auth.signInWithPassword({
         email,
         password
       });
 
       if (error) {
-        messageEl.textContent = error.message;
-        messageEl.classList.add("error");
-      } else {
-        messageEl.textContent = "Signing in...";
-        messageEl.classList.remove("error");
+        document.getElementById("loginError").textContent = error.message;
       }
-    } catch (err) {
-      messageEl.textContent = "An error occurred. Please try again.";
-      messageEl.classList.add("error");
-      console.error(err);
-    }
-  });
-}
-
-/* =========================
-   SHOW/HIDE PAGES
-========================= */
-
-function showLoginPage() {
-  document.getElementById("loginScreen").classList.remove("hidden");
-  document.getElementById("appShell").classList.add("hidden");
-}
-
-function showApp() {
-  document.getElementById("loginScreen").classList.add("hidden");
-  document.getElementById("appShell").classList.remove("hidden");
+    });
 }
 
 /* =========================
@@ -105,10 +100,7 @@ function showApp() {
 
 async function loadApp() {
   await loadNotes();
-  setupNavigation();
-  setupLogout();
-  setupSearch();
-  renderContent("home");
+  renderApp();
 }
 
 async function loadNotes() {
@@ -128,57 +120,133 @@ async function loadNotes() {
 }
 
 /* =========================
+   MAIN APP
+========================= */
+
+function renderApp() {
+  document.body.innerHTML = `
+    <div class="app">
+
+      <aside class="sidebar">
+
+        <div class="logo">
+          <h2>Knowledge System</h2>
+        </div>
+
+        <nav>
+          <button data-view="dashboard">Dashboard</button>
+          <button data-view="medicine">Medicine</button>
+          <button data-view="finance">Finance</button>
+          <button data-view="career">Career</button>
+          <button data-view="knowledge">Knowledge</button>
+          <button data-view="life">Life</button>
+          <button data-view="projects">Projects</button>
+          <button data-view="inbox">Inbox</button>
+          <button data-view="resources">Resources</button>
+          <button data-view="settings">Settings</button>
+        </nav>
+
+        <button id="logoutButton">Log Out</button>
+
+      </aside>
+
+      <main class="main-content">
+
+        <header class="topbar">
+
+          <div class="search-container">
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Search your knowledge..."
+            />
+          </div>
+
+          <button id="newNoteButton">
+            + New Note
+          </button>
+
+        </header>
+
+        <section id="content"></section>
+
+      </main>
+
+    </div>
+
+    <div id="modalContainer"></div>
+  `;
+
+  setupNavigation();
+  setupSearch();
+  setupGlobalButtons();
+
+  renderCurrentView();
+}
+
+/* =========================
    NAVIGATION
 ========================= */
 
 function setupNavigation() {
-  const navButtons = document.querySelectorAll("[data-section]");
-  
-  navButtons.forEach(button => {
-    button.addEventListener("click", () => {
-      navButtons.forEach(b => b.classList.remove("active"));
-      button.classList.add("active");
-      renderContent(button.dataset.section);
-    });
+  document.addEventListener("click", (e) => {
+    const button = e.target.closest("[data-view]");
+
+    if (!button) return;
+
+    currentView = button.dataset.view;
+    renderCurrentView();
   });
 }
 
-function renderContent(section) {
-  const contentEl = document.getElementById("content");
-  
-  switch(section) {
-    case "home":
-      renderDashboard(contentEl);
+function renderCurrentView() {
+  const content = document.getElementById("content");
+
+  if (!content) return;
+
+  switch (currentView) {
+    case "dashboard":
+      renderDashboard();
       break;
-    case "inbox":
-      renderInbox(contentEl);
-      break;
+
     case "medicine":
-      renderNotesByArea(contentEl, "Medicine");
+      renderNotesByArea("Medicine");
       break;
+
     case "finance":
-      renderNotesByArea(contentEl, "Finance");
+      renderNotesByArea("Finance");
       break;
+
     case "career":
-      renderNotesByArea(contentEl, "Career");
+      renderNotesByArea("Career");
       break;
-    case "projects":
-      renderNotesByArea(contentEl, "Projects");
-      break;
+
     case "knowledge":
-      renderNotesByArea(contentEl, "Knowledge");
+      renderNotesByArea("Knowledge");
       break;
+
     case "life":
-      renderNotesByArea(contentEl, "Life");
+      renderNotesByArea("Life");
       break;
+
+    case "projects":
+      renderNotesByArea("Projects");
+      break;
+
+    case "inbox":
+      renderInbox();
+      break;
+
     case "resources":
-      renderNotesByArea(contentEl, "Resources");
+      renderResources();
       break;
+
     case "settings":
-      renderSettings(contentEl);
+      renderSettings();
       break;
+
     default:
-      renderDashboard(contentEl);
+      renderDashboard();
   }
 }
 
@@ -186,36 +254,44 @@ function renderContent(section) {
    DASHBOARD
 ========================= */
 
-function renderDashboard(contentEl) {
+function renderDashboard() {
+  const content = document.getElementById("content");
+
   const favorites = notes.filter(n => n.favorite);
   const inbox = notes.filter(n => n.status === "Inbox");
 
-  contentEl.innerHTML = `
+  content.innerHTML = `
     <div class="page-header">
-      <h1>Dashboard</h1>
+      <h1>Good morning</h1>
       <p>Your personal knowledge system.</p>
     </div>
 
     <div class="stats-grid">
+
       <div class="stat-card">
         <h3>${notes.length}</h3>
         <p>Total Notes</p>
       </div>
+
       <div class="stat-card">
         <h3>${favorites.length}</h3>
         <p>Favorites</p>
       </div>
+
       <div class="stat-card">
         <h3>${inbox.length}</h3>
         <p>Inbox</p>
       </div>
+
     </div>
 
     <div class="section-header">
       <h2>Recently Added</h2>
     </div>
 
-    ${renderNoteCards(notes.slice(0, 10))}
+    <div id="recentNotes">
+      ${renderNoteCards(notes.slice(0, 10))}
+    </div>
   `;
 }
 
@@ -224,21 +300,67 @@ function renderDashboard(contentEl) {
 ========================= */
 
 function renderNoteCards(noteList) {
+
   if (!noteList.length) {
-    return `<div class="empty-state"><p>No notes yet.</p></div>`;
+    return `
+      <div class="empty-state">
+        <p>No notes yet.</p>
+        <button id="emptyNewNote">Create your first note</button>
+      </div>
+    `;
   }
 
   return `
     <div class="notes-grid">
       ${noteList.map(note => `
-        <div class="note-card" data-note-id="${note.id}">
-          <h3>${escapeHtml(note.title || "Untitled")}</h3>
-          ${note.summary ? `<p>${escapeHtml(note.summary)}</p>` : ""}
-          <div class="note-meta">
-            ${note.area ? `<span>${escapeHtml(note.area)}</span>` : ""}
-            ${note.type ? `<span>${escapeHtml(note.type)}</span>` : ""}
-            ${note.status ? `<span>${escapeHtml(note.status)}</span>` : ""}
+        <div
+          class="note-card"
+          data-note-id="${note.id}"
+          onclick="openNote('${note.id}')"
+        >
+
+          <div class="note-card-header">
+
+            <h3>
+              ${escapeHtml(note.title || "Untitled")}
+            </h3>
+
+            ${
+              note.favorite
+                ? `<span class="favorite">â˜…</span>`
+                : ""
+            }
+
           </div>
+
+          ${
+            note.summary
+              ? `<p>${escapeHtml(note.summary)}</p>`
+              : ""
+          }
+
+          <div class="note-meta">
+
+            ${
+              note.area
+                ? `<span>${escapeHtml(note.area)}</span>`
+                : ""
+            }
+
+            ${
+              note.type
+                ? `<span>${escapeHtml(note.type)}</span>`
+                : ""
+            }
+
+            ${
+              note.status
+                ? `<span>${escapeHtml(note.status)}</span>`
+                : ""
+            }
+
+          </div>
+
         </div>
       `).join("")}
     </div>
@@ -249,14 +371,20 @@ function renderNoteCards(noteList) {
    AREA VIEWS
 ========================= */
 
-function renderNotesByArea(contentEl, area) {
-  const filtered = notes.filter(note => note.area === area);
-  
-  contentEl.innerHTML = `
+function renderNotesByArea(area) {
+
+  const content = document.getElementById("content");
+
+  const filtered = notes.filter(
+    note => note.area === area
+  );
+
+  content.innerHTML = `
     <div class="page-header">
       <h1>${area}</h1>
       <p>${filtered.length} notes</p>
     </div>
+
     ${renderNoteCards(filtered)}
   `;
 }
@@ -265,14 +393,20 @@ function renderNotesByArea(contentEl, area) {
    INBOX
 ========================= */
 
-function renderInbox(contentEl) {
-  const inboxNotes = notes.filter(note => note.status === "Inbox");
-  
-  contentEl.innerHTML = `
+function renderInbox() {
+
+  const content = document.getElementById("content");
+
+  const inboxNotes = notes.filter(
+    note => note.status === "Inbox"
+  );
+
+  content.innerHTML = `
     <div class="page-header">
       <h1>Inbox</h1>
       <p>Notes that still need processing.</p>
     </div>
+
     ${renderNoteCards(inboxNotes)}
   `;
 }
@@ -281,14 +415,20 @@ function renderInbox(contentEl) {
    RESOURCES
 ========================= */
 
-function renderResources(contentEl) {
-  const resources = notes.filter(note => note.type === "Resource");
-  
-  contentEl.innerHTML = `
+function renderResources() {
+
+  const content = document.getElementById("content");
+
+  const resources = notes.filter(
+    note => note.type === "Resource"
+  );
+
+  content.innerHTML = `
     <div class="page-header">
       <h1>Resources</h1>
       <p>Saved references and useful materials.</p>
     </div>
+
     ${renderNoteCards(resources)}
   `;
 }
@@ -297,28 +437,22 @@ function renderResources(contentEl) {
    SETTINGS
 ========================= */
 
-function renderSettings(contentEl) {
-  contentEl.innerHTML = `
+function renderSettings() {
+
+  const content = document.getElementById("content");
+
+  content.innerHTML = `
     <div class="page-header">
       <h1>Settings</h1>
     </div>
+
     <div class="settings-card">
-      <p>Logged in as: <strong>${escapeHtml(currentUser.email)}</strong></p>
+      <p>
+        Logged in as:
+        <strong>${escapeHtml(currentUser.email)}</strong>
+      </p>
     </div>
   `;
-}
-
-/* =========================
-   LOGOUT
-========================= */
-
-function setupLogout() {
-  const logoutBtn = document.getElementById("logoutBtn");
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", async () => {
-      await supabaseClient.auth.signOut();
-    });
-  }
 }
 
 /* =========================
@@ -326,15 +460,19 @@ function setupLogout() {
 ========================= */
 
 function setupSearch() {
-  const searchInput = document.getElementById("search");
-  
-  if (!searchInput) return;
 
-  searchInput.addEventListener("input", () => {
-    const query = searchInput.value.trim().toLowerCase();
-    
+  const input = document.getElementById("searchInput");
+
+  if (!input) return;
+
+  input.addEventListener("input", () => {
+
+    const query = input.value
+      .trim()
+      .toLowerCase();
+
     if (!query) {
-      renderContent("home");
+      renderCurrentView();
       return;
     }
 
@@ -343,10 +481,13 @@ function setupSearch() {
 }
 
 function performSearch(query) {
-  const contentEl = document.getElementById("content");
-  
+
+  const content = document.getElementById("content");
+
   const results = notes.filter(note => {
+
     const searchableText = [
+
       note.title,
       note.summary,
       note.content,
@@ -355,7 +496,10 @@ function performSearch(query) {
       note.status,
       note.source,
       note.url,
-      Array.isArray(note.tags) ? note.tags.join(" ") : note.tags
+      Array.isArray(note.tags)
+        ? note.tags.join(" ")
+        : note.tags
+
     ]
       .filter(Boolean)
       .join(" ")
@@ -364,20 +508,523 @@ function performSearch(query) {
     return searchableText.includes(query);
   });
 
-  contentEl.innerHTML = `
+  content.innerHTML = `
     <div class="page-header">
+
       <h1>Search Results</h1>
-      <p>${results.length} ${results.length === 1 ? "result" : "results"}</p>
+
+      <p>
+        ${results.length}
+        ${results.length === 1 ? "result" : "results"}
+      </p>
+
     </div>
+
     ${renderNoteCards(results)}
   `;
 }
 
 /* =========================
+   NOTE MODAL
+========================= */
+
+window.openNote = function(noteId) {
+
+  const note = notes.find(
+    n => String(n.id) === String(noteId)
+  );
+
+  if (!note) {
+    console.error("Could not find note:", noteId);
+    return;
+  }
+
+  currentNote = note;
+
+  const modalContainer =
+    document.getElementById("modalContainer");
+
+  modalContainer.innerHTML = `
+
+    <div class="modal-overlay" id="noteModal">
+
+      <div class="note-modal">
+
+        <div class="modal-header">
+
+          <h2>
+            ${escapeHtml(note.title || "Untitled")}
+          </h2>
+
+          <button
+            onclick="closeNoteModal()"
+            class="close-button"
+          >
+            Ã—
+          </button>
+
+        </div>
+
+        <div class="note-details">
+
+          ${
+            note.summary
+              ? `
+                <div class="note-summary">
+                  <strong>Summary</strong>
+                  <p>${escapeHtml(note.summary)}</p>
+                </div>
+              `
+              : ""
+          }
+
+          <div class="note-meta">
+
+            ${
+              note.area
+                ? `<span>Area: ${escapeHtml(note.area)}</span>`
+                : ""
+            }
+
+            ${
+              note.type
+                ? `<span>Type: ${escapeHtml(note.type)}</span>`
+                : ""
+            }
+
+            ${
+              note.status
+                ? `<span>Status: ${escapeHtml(note.status)}</span>`
+                : ""
+            }
+
+          </div>
+
+          <div class="note-content">
+
+            ${formatNoteContent(note.content)}
+
+          </div>
+
+          ${
+            note.source
+              ? `
+                <div class="note-source">
+                  <strong>Source:</strong>
+                  ${escapeHtml(note.source)}
+                </div>
+              `
+              : ""
+          }
+
+          ${
+            note.url
+              ? `
+                <div class="note-source">
+                  <a
+                    href="${escapeAttribute(note.url)}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open Source
+                  </a>
+                </div>
+              `
+              : ""
+          }
+
+        </div>
+
+        <div class="modal-actions">
+
+          <button onclick="editNote('${note.id}')">
+            Edit
+          </button>
+
+          <button onclick="deleteNote('${note.id}')">
+            Delete
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+  `;
+
+  document
+    .getElementById("noteModal")
+    .addEventListener("click", (e) => {
+
+      if (e.target.id === "noteModal") {
+        closeNoteModal();
+      }
+
+    });
+};
+
+window.closeNoteModal = function() {
+
+  const modal =
+    document.getElementById("noteModal");
+
+  if (modal) {
+    modal.remove();
+  }
+
+  currentNote = null;
+};
+
+/* =========================
+   NEW NOTE
+========================= */
+
+function setupGlobalButtons() {
+
+  const newButton =
+    document.getElementById("newNoteButton");
+
+  if (newButton) {
+    newButton.onclick = () => openNoteEditor();
+  }
+
+  const logoutButton =
+    document.getElementById("logoutButton");
+
+  if (logoutButton) {
+    logoutButton.onclick = async () => {
+      await supabaseClient.auth.signOut();
+    };
+  }
+}
+
+window.openNoteEditor = function(note = null) {
+
+  const modalContainer =
+    document.getElementById("modalContainer");
+
+  const isEditing = !!note;
+
+  modalContainer.innerHTML = `
+
+    <div class="modal-overlay">
+
+      <div class="note-modal">
+
+        <div class="modal-header">
+
+          <h2>
+            ${isEditing ? "Edit Note" : "New Note"}
+          </h2>
+
+          <button
+            onclick="closeEditor()"
+            class="close-button"
+          >
+            Ã—
+          </button>
+
+        </div>
+
+        <form id="noteForm">
+
+          <label>Title</label>
+
+          <input
+            id="noteTitle"
+            value="${escapeAttribute(note?.title || "")}"
+            required
+          />
+
+          <label>Summary</label>
+
+          <textarea
+            id="noteSummary"
+            rows="3"
+          >${escapeHtml(note?.summary || "")}</textarea>
+
+          <label>Area</label>
+
+          <select id="noteArea">
+
+            ${option("Medicine", note?.area)}
+            ${option("Finance", note?.area)}
+            ${option("Career", note?.area)}
+            ${option("Knowledge", note?.area)}
+            ${option("Life", note?.area)}
+            ${option("Projects", note?.area)}
+            ${option("Inbox", note?.area)}
+            ${option("Resources", note?.area)}
+
+          </select>
+
+          <label>Type</label>
+
+          <select id="noteType">
+
+            ${option("Note", note?.type)}
+            ${option("Clinical Pearl", note?.type)}
+            ${option("Resource", note?.type)}
+            ${option("Idea", note?.type)}
+            ${option("Project", note?.type)}
+            ${option("Reference", note?.type)}
+
+          </select>
+
+          <label>Status</label>
+
+          <select id="noteStatus">
+
+            ${option("Inbox", note?.status)}
+            ${option("Active", note?.status)}
+            ${option("Reviewed", note?.status)}
+            ${option("Archived", note?.status)}
+
+          </select>
+
+          <label>Review Date</label>
+
+          <input
+            type="date"
+            id="noteReviewDate"
+            value="${note?.review_date || ""}"
+          />
+
+          <label>Tags</label>
+
+          <input
+            id="noteTags"
+            value="${
+              Array.isArray(note?.tags)
+                ? note.tags.join(", ")
+                : note?.tags || ""
+            }"
+            placeholder="e.g. hypertension, cardiology"
+          />
+
+          <label>Content</label>
+
+          <textarea
+            id="noteContent"
+            rows="12"
+          >${escapeHtml(note?.content || "")}</textarea>
+
+          <label>Source</label>
+
+          <input
+            id="noteSource"
+            value="${escapeAttribute(note?.source || "")}"
+          />
+
+          <label>Source URL</label>
+
+          <input
+            id="noteUrl"
+            value="${escapeAttribute(note?.url || "")}"
+            type="url"
+          />
+
+          <label class="checkbox-label">
+
+            <input
+              type="checkbox"
+              id="noteFavorite"
+              ${note?.favorite ? "checked" : ""}
+            />
+
+            Favorite
+
+          </label>
+
+          <button type="submit">
+            ${isEditing ? "Save Changes" : "Save Note"}
+          </button>
+
+        </form>
+
+      </div>
+
+    </div>
+  `;
+
+  document
+    .getElementById("noteForm")
+    .addEventListener("submit", async (e) => {
+
+      e.preventDefault();
+
+      await saveNote(note?.id || null);
+
+    });
+};
+
+window.closeEditor = function() {
+
+  const modalContainer =
+    document.getElementById("modalContainer");
+
+  modalContainer.innerHTML = "";
+};
+
+/* =========================
+   SAVE NOTE
+========================= */
+
+async function saveNote(noteId) {
+
+  const tagsValue =
+    document.getElementById("noteTags").value;
+
+  const tags = tagsValue
+    .split(",")
+    .map(tag => tag.trim())
+    .filter(Boolean);
+
+  const noteData = {
+
+    title:
+      document.getElementById("noteTitle").value.trim(),
+
+    summary:
+      document.getElementById("noteSummary").value.trim(),
+
+    area:
+      document.getElementById("noteArea").value,
+
+    type:
+      document.getElementById("noteType").value,
+
+    status:
+      document.getElementById("noteStatus").value,
+
+    review_date:
+      document.getElementById("noteReviewDate").value || null,
+
+    tags,
+
+    content:
+      document.getElementById("noteContent").value,
+
+    source:
+      document.getElementById("noteSource").value.trim(),
+
+    url:
+      document.getElementById("noteUrl").value.trim(),
+
+    favorite:
+      document.getElementById("noteFavorite").checked
+
+  };
+
+  let result;
+
+  if (noteId) {
+
+    result = await supabaseClient
+      .from("notes")
+      .update(noteData)
+      .eq("id", noteId)
+      .eq("user_id", currentUser.id);
+
+  } else {
+
+    result = await supabaseClient
+      .from("notes")
+      .insert({
+        ...noteData,
+        user_id: currentUser.id
+      });
+
+  }
+
+  if (result.error) {
+
+    console.error(result.error);
+
+    alert(
+      "Could not save note:\n\n" +
+      result.error.message
+    );
+
+    return;
+  }
+
+  closeEditor();
+
+  await loadNotes();
+
+  renderCurrentView();
+}
+
+/* =========================
+   EDIT NOTE
+========================= */
+
+window.editNote = function(noteId) {
+
+  const note = notes.find(
+    n => String(n.id) === String(noteId)
+  );
+
+  if (!note) return;
+
+  closeNoteModal();
+
+  openNoteEditor(note);
+};
+
+/* =========================
+   DELETE NOTE
+========================= */
+
+window.deleteNote = async function(noteId) {
+
+  const confirmed =
+    confirm("Are you sure you want to delete this note?");
+
+  if (!confirmed) return;
+
+  const { error } = await supabaseClient
+    .from("notes")
+    .delete()
+    .eq("id", noteId)
+    .eq("user_id", currentUser.id);
+
+  if (error) {
+
+    alert(
+      "Could not delete note:\n\n" +
+      error.message
+    );
+
+    return;
+  }
+
+  closeNoteModal();
+
+  await loadNotes();
+
+  renderCurrentView();
+};
+
+/* =========================
    HELPERS
 ========================= */
 
+function option(value, selected) {
+
+  return `
+    <option
+      value="${escapeAttribute(value)}"
+      ${selected === value ? "selected" : ""}
+    >
+      ${escapeHtml(value)}
+    </option>
+  `;
+}
+
 function escapeHtml(value) {
+
   if (value === null || value === undefined) {
     return "";
   }
@@ -389,3 +1036,20 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+function escapeAttribute(value) {
+  return escapeHtml(value);
+}
+
+function formatNoteContent(content) {
+
+  if (!content) {
+    return "<p>No content.</p>";
+  }
+
+  return String(content)
+    .split("\n")
+    .map(line => `<p>${escapeHtml(line)}</p>`)
+    .join("");
+}
+```
