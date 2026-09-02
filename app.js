@@ -1,3 +1,4 @@
+```javascript
 const SUPABASE_URL = "https://uvshnvndkvplhwalopid.supabase.co";
 const SUPABASE_KEY = "sb_publishable_HFFGKwhEbvajsYdoHN_AHQ_qsns3gUy";
 
@@ -45,24 +46,26 @@ document.addEventListener("DOMContentLoaded", async () => {
 ========================= */
 
 function showLogin() {
-  // Remove any existing auth overlay
-  const existing = document.getElementById("authOverlay");
-  if (existing) existing.remove();
-
-  // Create overlay so we don't replace the whole page
-  const overlay = document.createElement("div");
-  overlay.id = "authOverlay";
-  overlay.className = "auth-overlay";
-  overlay.innerHTML = `
+  document.body.innerHTML = `
     <div class="auth-container">
       <div class="auth-card">
         <h1>My Knowledge System</h1>
         <p>Sign in to continue.</p>
 
         <form id="loginForm">
-          <input type="email" id="loginEmail" placeholder="Email" required />
+          <input
+            type="email"
+            id="loginEmail"
+            placeholder="Email"
+            required
+          />
 
-          <input type="password" id="loginPassword" placeholder="Password" required />
+          <input
+            type="password"
+            id="loginPassword"
+            placeholder="Password"
+            required
+          />
 
           <button type="submit">Sign In</button>
         </form>
@@ -71,13 +74,6 @@ function showLogin() {
       </div>
     </div>
   `;
-
-  // Close when clicking outside card
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) overlay.remove();
-  });
-
-  document.body.appendChild(overlay);
 
   document
     .getElementById("loginForm")
@@ -94,10 +90,6 @@ function showLogin() {
 
       if (error) {
         document.getElementById("loginError").textContent = error.message;
-      } else {
-        // On success, let the auth state change handler take over and remove overlay
-        const el = document.getElementById("authOverlay");
-        if (el) el.remove();
       }
     });
 }
@@ -1041,7 +1033,7 @@ function escapeHtml(value) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
+    .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
 
@@ -1060,3 +1052,4 @@ function formatNoteContent(content) {
     .map(line => `<p>${escapeHtml(line)}</p>`)
     .join("");
 }
+```
