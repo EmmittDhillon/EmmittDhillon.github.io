@@ -1,4 +1,3 @@
-```javascript
 const SUPABASE_URL = "https://uvshnvndkvplhwalopid.supabase.co";
 const SUPABASE_KEY = "sb_publishable_HFFGKwhEbvajsYdoHN_AHQ_qsns3gUy";
 
@@ -332,7 +331,7 @@ function renderNoteCards(noteList) {
 
             ${
               note.favorite
-                ? `<span class="favorite">â˜…</span>`
+                ? `<span class="favorite">★</span>`
                 : ""
             }
 
@@ -565,7 +564,7 @@ window.openNote = function(noteId) {
             onclick="closeNoteModal()"
             class="close-button"
           >
-            Ã—
+            ×
           </button>
 
         </div>
@@ -726,7 +725,7 @@ window.openNoteEditor = function(note = null) {
             onclick="closeEditor()"
             class="close-button"
           >
-            Ã—
+            ×
           </button>
 
         </div>
@@ -1057,4 +1056,3 @@ function formatNoteContent(content) {
     .map(line => `<p>${escapeHtml(line)}</p>`)
     .join("");
 }
-```
