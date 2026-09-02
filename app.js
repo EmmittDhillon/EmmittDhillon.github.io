@@ -1,3 +1,4 @@
+```javascript
 const SUPABASE_URL = "https://uvshnvndkvplhwalopid.supabase.co";
 const SUPABASE_KEY = "sb_publishable_HFFGKwhEbvajsYdoHN_AHQ_qsns3gUy";
 
@@ -20,9 +21,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupSearch();
   setupGlobalButtons();
 
-  const { data, error } = await supabaseClient.auth.getSession();
+  const { data } = await supabaseClient.auth.getSession();
 
-  if (data?.session) {
+  if (data.session) {
     currentUser = data.session.user;
     await loadApp();
   } else {
@@ -69,7 +70,7 @@ function showLogin() {
           <button type="submit">Sign In</button>
         </form>
 
-        <p id="loginError" style="color: red; margin-top: 10px;"></p>
+        <p id="loginError"></p>
       </div>
     </div>
   `;
@@ -79,19 +80,16 @@ function showLogin() {
     .addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const email = document.getElementById("loginEmail").value.trim();
+      const email = document.getElementById("loginEmail").value;
       const password = document.getElementById("loginPassword").value;
-      const errorElement = document.getElementById("loginError");
 
-      errorElement.textContent = "";
-
-      const { data, error } = await supabaseClient.auth.signInWithPassword({
+      const { error } = await supabaseClient.auth.signInWithPassword({
         email,
         password
       });
 
       if (error) {
-        errorElement.textContent = error.message;
+        document.getElementById("loginError").textContent = error.message;
       }
     });
 }
@@ -106,8 +104,6 @@ async function loadApp() {
 }
 
 async function loadNotes() {
-  if (!currentUser) return;
-
   const { data, error } = await supabaseClient
     .from("notes")
     .select("*")
@@ -309,7 +305,7 @@ function renderNoteCards(noteList) {
     return `
       <div class="empty-state">
         <p>No notes yet.</p>
-        <button id="emptyNewNote" onclick="openNoteEditor()">Create your first note</button>
+        <button id="emptyNewNote">Create your first note</button>
       </div>
     `;
   }
@@ -331,7 +327,7 @@ function renderNoteCards(noteList) {
 
             ${
               note.favorite
-                ? `<span class="favorite">★</span>`
+                ? `<span class="favorite">â˜…</span>`
                 : ""
             }
 
@@ -453,7 +449,7 @@ function renderSettings() {
     <div class="settings-card">
       <p>
         Logged in as:
-        <strong>${escapeHtml(currentUser?.email || "")}</strong>
+        <strong>${escapeHtml(currentUser.email)}</strong>
       </p>
     </div>
   `;
@@ -564,7 +560,7 @@ window.openNote = function(noteId) {
             onclick="closeNoteModal()"
             class="close-button"
           >
-            ×
+            Ã—
           </button>
 
         </div>
@@ -725,7 +721,7 @@ window.openNoteEditor = function(note = null) {
             onclick="closeEditor()"
             class="close-button"
           >
-            ×
+            Ã—
           </button>
 
         </div>
@@ -1056,3 +1052,4 @@ function formatNoteContent(content) {
     .map(line => `<p>${escapeHtml(line)}</p>`)
     .join("");
 }
+```
