@@ -1,4 +1,3 @@
-```javascript
 const SUPABASE_URL = "https://uvshnvndkvplhwalopid.supabase.co";
 const SUPABASE_KEY = "sb_publishable_HFFGKwhEbvajsYdoHN_AHQ_qsns3gUy";
 
@@ -17,9 +16,9 @@ let currentView = "dashboard";
 ========================= */
 
 document.addEventListener("DOMContentLoaded", async () => {
-  setupNavigation();
   setupSearch();
   setupGlobalButtons();
+  setupNavigation();
 
   const { data } = await supabaseClient.auth.getSession();
 
@@ -46,52 +45,40 @@ document.addEventListener("DOMContentLoaded", async () => {
 ========================= */
 
 function showLogin() {
-  document.body.innerHTML = `
-    <div class="auth-container">
-      <div class="auth-card">
-        <h1>My Knowledge System</h1>
-        <p>Sign in to continue.</p>
+  const loginScreen = document.getElementById("loginScreen");
+  const appShell = document.getElementById("appShell");
+  
+  loginScreen.classList.remove("hidden");
+  appShell.classList.add("hidden");
 
-        <form id="loginForm">
-          <input
-            type="email"
-            id="loginEmail"
-            placeholder="Email"
-            required
-          />
+  const loginForm = document.getElementById("loginForm");
+  const loginMessage = document.getElementById("loginMessage");
 
-          <input
-            type="password"
-            id="loginPassword"
-            placeholder="Password"
-            required
-          />
+  // Clear any previous error messages
+  loginMessage.textContent = "";
 
-          <button type="submit">Sign In</button>
-        </form>
+  loginForm.addEventListener("submit", handleLoginSubmit, { once: true });
+}
 
-        <p id="loginError"></p>
-      </div>
-    </div>
-  `;
+async function handleLoginSubmit(e) {
+  e.preventDefault();
 
-  document
-    .getElementById("loginForm")
-    .addEventListener("submit", async (e) => {
-      e.preventDefault();
+  const email = document.getElementById("loginEmail").value;
+  const password = document.getElementById("loginPassword").value;
+  const loginMessage = document.getElementById("loginMessage");
 
-      const email = document.getElementById("loginEmail").value;
-      const password = document.getElementById("loginPassword").value;
+  const { error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
 
-      const { error } = await supabaseClient.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) {
-        document.getElementById("loginError").textContent = error.message;
-      }
-    });
+  if (error) {
+    loginMessage.textContent = error.message;
+    loginMessage.style.color = "red";
+    
+    // Re-attach listener for next attempt
+    document.getElementById("loginForm").addEventListener("submit", handleLoginSubmit, { once: true });
+  }
 }
 
 /* =========================
@@ -100,7 +87,8 @@ function showLogin() {
 
 async function loadApp() {
   await loadNotes();
-  renderApp();
+  showApp();
+  renderCurrentView();
 }
 
 async function loadNotes() {
@@ -119,69 +107,12 @@ async function loadNotes() {
   notes = data || [];
 }
 
-/* =========================
-   MAIN APP
-========================= */
-
-function renderApp() {
-  document.body.innerHTML = `
-    <div class="app">
-
-      <aside class="sidebar">
-
-        <div class="logo">
-          <h2>Knowledge System</h2>
-        </div>
-
-        <nav>
-          <button data-view="dashboard">Dashboard</button>
-          <button data-view="medicine">Medicine</button>
-          <button data-view="finance">Finance</button>
-          <button data-view="career">Career</button>
-          <button data-view="knowledge">Knowledge</button>
-          <button data-view="life">Life</button>
-          <button data-view="projects">Projects</button>
-          <button data-view="inbox">Inbox</button>
-          <button data-view="resources">Resources</button>
-          <button data-view="settings">Settings</button>
-        </nav>
-
-        <button id="logoutButton">Log Out</button>
-
-      </aside>
-
-      <main class="main-content">
-
-        <header class="topbar">
-
-          <div class="search-container">
-            <input
-              type="text"
-              id="searchInput"
-              placeholder="Search your knowledge..."
-            />
-          </div>
-
-          <button id="newNoteButton">
-            + New Note
-          </button>
-
-        </header>
-
-        <section id="content"></section>
-
-      </main>
-
-    </div>
-
-    <div id="modalContainer"></div>
-  `;
-
-  setupNavigation();
-  setupSearch();
-  setupGlobalButtons();
-
-  renderCurrentView();
+function showApp() {
+  const loginScreen = document.getElementById("loginScreen");
+  const appShell = document.getElementById("appShell");
+  
+  loginScreen.classList.add("hidden");
+  appShell.classList.remove("hidden");
 }
 
 /* =========================
@@ -189,13 +120,19 @@ function renderApp() {
 ========================= */
 
 function setupNavigation() {
-  document.addEventListener("click", (e) => {
-    const button = e.target.closest("[data-view]");
+  const navButtons = document.querySelectorAll("[data-section]");
 
-    if (!button) return;
+  navButtons.forEach(button => {
+    button.addEventListener("click", () => {
+      // Remove active class from all buttons
+      navButtons.forEach(b => b.classList.remove("active"));
+      
+      // Add active class to clicked button
+      button.classList.add("active");
 
-    currentView = button.dataset.view;
-    renderCurrentView();
+      currentView = button.dataset.section;
+      renderCurrentView();
+    });
   });
 }
 
@@ -205,7 +142,7 @@ function renderCurrentView() {
   if (!content) return;
 
   switch (currentView) {
-    case "dashboard":
+    case "home":
       renderDashboard();
       break;
 
@@ -305,7 +242,7 @@ function renderNoteCards(noteList) {
     return `
       <div class="empty-state">
         <p>No notes yet.</p>
-        <button id="emptyNewNote">Create your first note</button>
+        <button id="emptyNewNote" onclick="openNoteEditor()">Create your first note</button>
       </div>
     `;
   }
@@ -327,7 +264,7 @@ function renderNoteCards(noteList) {
 
             ${
               note.favorite
-                ? `<span class="favorite">â˜…</span>`
+                ? `<span class="favorite">★</span>`
                 : ""
             }
 
@@ -381,7 +318,7 @@ function renderNotesByArea(area) {
 
   content.innerHTML = `
     <div class="page-header">
-      <h1>${area}</h1>
+      <h1>${escapeHtml(area)}</h1>
       <p>${filtered.length} notes</p>
     </div>
 
@@ -461,7 +398,7 @@ function renderSettings() {
 
 function setupSearch() {
 
-  const input = document.getElementById("searchInput");
+  const input = document.getElementById("search");
 
   if (!input) return;
 
@@ -541,137 +478,102 @@ window.openNote = function(noteId) {
 
   currentNote = note;
 
-  const modalContainer =
-    document.getElementById("modalContainer");
+  const modalContent = document.getElementById("modalContent");
+  const modal = document.getElementById("modal");
 
-  modalContainer.innerHTML = `
+  modalContent.innerHTML = `
 
-    <div class="modal-overlay" id="noteModal">
+    <div class="note-details">
 
-      <div class="note-modal">
+      <h2>${escapeHtml(note.title || "Untitled")}</h2>
 
-        <div class="modal-header">
+      ${
+        note.summary
+          ? `
+            <div class="note-summary">
+              <strong>Summary</strong>
+              <p>${escapeHtml(note.summary)}</p>
+            </div>
+          `
+          : ""
+      }
 
-          <h2>
-            ${escapeHtml(note.title || "Untitled")}
-          </h2>
+      <div class="note-meta">
 
-          <button
-            onclick="closeNoteModal()"
-            class="close-button"
-          >
-            Ã—
-          </button>
+        ${
+          note.area
+            ? `<span>Area: ${escapeHtml(note.area)}</span>`
+            : ""
+        }
 
-        </div>
+        ${
+          note.type
+            ? `<span>Type: ${escapeHtml(note.type)}</span>`
+            : ""
+        }
 
-        <div class="note-details">
-
-          ${
-            note.summary
-              ? `
-                <div class="note-summary">
-                  <strong>Summary</strong>
-                  <p>${escapeHtml(note.summary)}</p>
-                </div>
-              `
-              : ""
-          }
-
-          <div class="note-meta">
-
-            ${
-              note.area
-                ? `<span>Area: ${escapeHtml(note.area)}</span>`
-                : ""
-            }
-
-            ${
-              note.type
-                ? `<span>Type: ${escapeHtml(note.type)}</span>`
-                : ""
-            }
-
-            ${
-              note.status
-                ? `<span>Status: ${escapeHtml(note.status)}</span>`
-                : ""
-            }
-
-          </div>
-
-          <div class="note-content">
-
-            ${formatNoteContent(note.content)}
-
-          </div>
-
-          ${
-            note.source
-              ? `
-                <div class="note-source">
-                  <strong>Source:</strong>
-                  ${escapeHtml(note.source)}
-                </div>
-              `
-              : ""
-          }
-
-          ${
-            note.url
-              ? `
-                <div class="note-source">
-                  <a
-                    href="${escapeAttribute(note.url)}"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open Source
-                  </a>
-                </div>
-              `
-              : ""
-          }
-
-        </div>
-
-        <div class="modal-actions">
-
-          <button onclick="editNote('${note.id}')">
-            Edit
-          </button>
-
-          <button onclick="deleteNote('${note.id}')">
-            Delete
-          </button>
-
-        </div>
+        ${
+          note.status
+            ? `<span>Status: ${escapeHtml(note.status)}</span>`
+            : ""
+        }
 
       </div>
+
+      <div class="note-content">
+
+        ${formatNoteContent(note.content)}
+
+      </div>
+
+      ${
+        note.source
+          ? `
+            <div class="note-source">
+              <strong>Source:</strong>
+              ${escapeHtml(note.source)}
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        note.url
+          ? `
+            <div class="note-source">
+              <a
+                href="${escapeAttribute(note.url)}"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open Source
+              </a>
+            </div>
+          `
+          : ""
+      }
+
+    </div>
+
+    <div class="modal-actions">
+
+      <button onclick="editNote('${note.id}')">
+        Edit
+      </button>
+
+      <button onclick="deleteNote('${note.id}')">
+        Delete
+      </button>
 
     </div>
   `;
 
-  document
-    .getElementById("noteModal")
-    .addEventListener("click", (e) => {
-
-      if (e.target.id === "noteModal") {
-        closeNoteModal();
-      }
-
-    });
+  modal.classList.remove("hidden");
 };
 
 window.closeNoteModal = function() {
-
-  const modal =
-    document.getElementById("noteModal");
-
-  if (modal) {
-    modal.remove();
-  }
-
+  const modal = document.getElementById("modal");
+  modal.classList.add("hidden");
   currentNote = null;
 };
 
@@ -681,171 +583,161 @@ window.closeNoteModal = function() {
 
 function setupGlobalButtons() {
 
-  const newButton =
-    document.getElementById("newNoteButton");
+  const newButton = document.getElementById("newNoteButton");
 
   if (newButton) {
     newButton.onclick = () => openNoteEditor();
   }
 
-  const logoutButton =
-    document.getElementById("logoutButton");
+  const logoutButton = document.getElementById("logoutBtn");
 
   if (logoutButton) {
     logoutButton.onclick = async () => {
       await supabaseClient.auth.signOut();
     };
   }
+
+  const modalClose = document.getElementById("modalClose");
+  if (modalClose) {
+    modalClose.onclick = closeNoteModal;
+  }
 }
 
 window.openNoteEditor = function(note = null) {
 
-  const modalContainer =
-    document.getElementById("modalContainer");
+  const modalContent = document.getElementById("modalContent");
+  const modal = document.getElementById("modal");
 
   const isEditing = !!note;
 
-  modalContainer.innerHTML = `
+  modalContent.innerHTML = `
 
-    <div class="modal-overlay">
+    <div class="editor-form">
 
-      <div class="note-modal">
+      <h2>
+        ${isEditing ? "Edit Note" : "New Note"}
+      </h2>
 
-        <div class="modal-header">
+      <form id="noteForm">
 
-          <h2>
-            ${isEditing ? "Edit Note" : "New Note"}
-          </h2>
+        <label>Title</label>
 
-          <button
-            onclick="closeEditor()"
-            class="close-button"
-          >
-            Ã—
-          </button>
+        <input
+          id="noteTitle"
+          value="${escapeAttribute(note?.title || "")}"
+          required
+        />
 
-        </div>
+        <label>Summary</label>
 
-        <form id="noteForm">
+        <textarea
+          id="noteSummary"
+          rows="3"
+        >${escapeHtml(note?.summary || "")}</textarea>
 
-          <label>Title</label>
+        <label>Area</label>
 
-          <input
-            id="noteTitle"
-            value="${escapeAttribute(note?.title || "")}"
-            required
-          />
+        <select id="noteArea">
 
-          <label>Summary</label>
+          ${option("Medicine", note?.area)}
+          ${option("Finance", note?.area)}
+          ${option("Career", note?.area)}
+          ${option("Knowledge", note?.area)}
+          ${option("Life", note?.area)}
+          ${option("Projects", note?.area)}
+          ${option("Inbox", note?.area)}
+          ${option("Resources", note?.area)}
 
-          <textarea
-            id="noteSummary"
-            rows="3"
-          >${escapeHtml(note?.summary || "")}</textarea>
+        </select>
 
-          <label>Area</label>
+        <label>Type</label>
 
-          <select id="noteArea">
+        <select id="noteType">
 
-            ${option("Medicine", note?.area)}
-            ${option("Finance", note?.area)}
-            ${option("Career", note?.area)}
-            ${option("Knowledge", note?.area)}
-            ${option("Life", note?.area)}
-            ${option("Projects", note?.area)}
-            ${option("Inbox", note?.area)}
-            ${option("Resources", note?.area)}
+          ${option("Note", note?.type)}
+          ${option("Clinical Pearl", note?.type)}
+          ${option("Resource", note?.type)}
+          ${option("Idea", note?.type)}
+          ${option("Project", note?.type)}
+          ${option("Reference", note?.type)}
 
-          </select>
+        </select>
 
-          <label>Type</label>
+        <label>Status</label>
 
-          <select id="noteType">
+        <select id="noteStatus">
 
-            ${option("Note", note?.type)}
-            ${option("Clinical Pearl", note?.type)}
-            ${option("Resource", note?.type)}
-            ${option("Idea", note?.type)}
-            ${option("Project", note?.type)}
-            ${option("Reference", note?.type)}
+          ${option("Inbox", note?.status)}
+          ${option("Active", note?.status)}
+          ${option("Reviewed", note?.status)}
+          ${option("Archived", note?.status)}
 
-          </select>
+        </select>
 
-          <label>Status</label>
+        <label>Review Date</label>
 
-          <select id="noteStatus">
+        <input
+          type="date"
+          id="noteReviewDate"
+          value="${note?.review_date || ""}"
+        />
 
-            ${option("Inbox", note?.status)}
-            ${option("Active", note?.status)}
-            ${option("Reviewed", note?.status)}
-            ${option("Archived", note?.status)}
+        <label>Tags</label>
 
-          </select>
+        <input
+          id="noteTags"
+          value="${
+            Array.isArray(note?.tags)
+              ? note.tags.join(", ")
+              : note?.tags || ""
+          }"
+          placeholder="e.g. hypertension, cardiology"
+        />
 
-          <label>Review Date</label>
+        <label>Content</label>
 
-          <input
-            type="date"
-            id="noteReviewDate"
-            value="${note?.review_date || ""}"
-          />
+        <textarea
+          id="noteContent"
+          rows="12"
+        >${escapeHtml(note?.content || "")}</textarea>
 
-          <label>Tags</label>
+        <label>Source</label>
 
-          <input
-            id="noteTags"
-            value="${
-              Array.isArray(note?.tags)
-                ? note.tags.join(", ")
-                : note?.tags || ""
-            }"
-            placeholder="e.g. hypertension, cardiology"
-          />
+        <input
+          id="noteSource"
+          value="${escapeAttribute(note?.source || "")}"
+        />
 
-          <label>Content</label>
+        <label>Source URL</label>
 
-          <textarea
-            id="noteContent"
-            rows="12"
-          >${escapeHtml(note?.content || "")}</textarea>
+        <input
+          id="noteUrl"
+          value="${escapeAttribute(note?.url || "")}"
+          type="url"
+        />
 
-          <label>Source</label>
-
-          <input
-            id="noteSource"
-            value="${escapeAttribute(note?.source || "")}"
-          />
-
-          <label>Source URL</label>
+        <label class="checkbox-label">
 
           <input
-            id="noteUrl"
-            value="${escapeAttribute(note?.url || "")}"
-            type="url"
+            type="checkbox"
+            id="noteFavorite"
+            ${note?.favorite ? "checked" : ""}
           />
 
-          <label class="checkbox-label">
+          Favorite
 
-            <input
-              type="checkbox"
-              id="noteFavorite"
-              ${note?.favorite ? "checked" : ""}
-            />
+        </label>
 
-            Favorite
+        <button type="submit">
+          ${isEditing ? "Save Changes" : "Save Note"}
+        </button>
 
-          </label>
-
-          <button type="submit">
-            ${isEditing ? "Save Changes" : "Save Note"}
-          </button>
-
-        </form>
-
-      </div>
+      </form>
 
     </div>
   `;
+
+  modal.classList.remove("hidden");
 
   document
     .getElementById("noteForm")
@@ -856,14 +748,6 @@ window.openNoteEditor = function(note = null) {
       await saveNote(note?.id || null);
 
     });
-};
-
-window.closeEditor = function() {
-
-  const modalContainer =
-    document.getElementById("modalContainer");
-
-  modalContainer.innerHTML = "";
 };
 
 /* =========================
@@ -949,7 +833,7 @@ async function saveNote(noteId) {
     return;
   }
 
-  closeEditor();
+  closeNoteModal();
 
   await loadNotes();
 
@@ -1052,4 +936,3 @@ function formatNoteContent(content) {
     .map(line => `<p>${escapeHtml(line)}</p>`)
     .join("");
 }
-```
