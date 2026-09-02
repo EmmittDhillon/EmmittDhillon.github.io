@@ -19,7 +19,6 @@ let currentView = "dashboard";
 document.addEventListener("DOMContentLoaded", async () => {
   setupNavigation();
   setupSearch();
-  setupAuthForms();
   setupGlobalButtons();
 
   const { data } = await supabaseClient.auth.getSession();
