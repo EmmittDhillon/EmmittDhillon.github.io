@@ -1,4 +1,3 @@
-```javascript
 const SUPABASE_URL = "https://uvshnvndkvplhwalopid.supabase.co";
 const SUPABASE_KEY = "sb_publishable_HFFGKwhEbvajsYdoHN_AHQ_qsns3gUy";
 
@@ -1033,7 +1032,7 @@ function escapeHtml(value) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
 
@@ -1052,4 +1051,3 @@ function formatNoteContent(content) {
     .map(line => `<p>${escapeHtml(line)}</p>`)
     .join("");
 }
-```
