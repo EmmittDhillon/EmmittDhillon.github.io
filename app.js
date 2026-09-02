@@ -75,14 +75,15 @@ function showLogin() {
     </div>
   `;
 
-  document
-    .getElementById("loginForm")
-    .addEventListener("submit", async (e) => {
-      e.preventDefault();
+  const loginForm = document.getElementById("loginForm");
+  
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-      const email = document.getElementById("loginEmail").value;
-      const password = document.getElementById("loginPassword").value;
+    const email = document.getElementById("loginEmail").value;
+    const password = document.getElementById("loginPassword").value;
 
+    try {
       const { error } = await supabaseClient.auth.signInWithPassword({
         email,
         password
@@ -91,7 +92,11 @@ function showLogin() {
       if (error) {
         document.getElementById("loginError").textContent = error.message;
       }
-    });
+    } catch (err) {
+      document.getElementById("loginError").textContent = "An error occurred. Please try again.";
+      console.error(err);
+    }
+  });
 }
 
 /* =========================
