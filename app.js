@@ -1051,4 +1051,3 @@ function formatNoteContent(content) {
     .map(line => `<p>${escapeHtml(line)}</p>`)
     .join("");
 }
-```
